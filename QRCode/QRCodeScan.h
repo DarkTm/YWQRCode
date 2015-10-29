@@ -8,12 +8,14 @@
 
 #import <UIKit/UIKit.h>
 
-typedef void(^QRCodeScanBlock)(id rslt);
-
+typedef void(^QRCodeScanImageBlock)(id rslt);
+typedef void(^QRCodeScanRsltBlock)(id rslt);
 @interface QRCodeScan : UIView
 
+@property (nonatomic, assign) CGRect scanRect;
+@property (nonatomic, copy) QRCodeScanImageBlock imageBlock;
+@property (nonatomic, copy) QRCodeScanRsltBlock rsltBlock;
+
 - (void)start;
-
-- (void)setCompleteBlock:(QRCodeScanBlock )block;
-
+- (void) turnTorchOn: (bool) on;
 @end

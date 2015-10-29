@@ -7,12 +7,12 @@
 //
 
 #import "QRCodeScan.h"
+#import "QRCodeDecode.h"
+#import "UIImage+QR.h"
+
 @import AVFoundation;
 
 @interface QRCodeScan ()<AVCaptureMetadataOutputObjectsDelegate,AVCaptureVideoDataOutputSampleBufferDelegate>
-
-@property (nonatomic, copy) QRCodeScanBlock completeBlock;
-
 
 @property (nonatomic, strong) AVCaptureDevice            *device;
 @property (nonatomic, strong) AVCaptureDeviceInput       *input;
@@ -21,6 +21,7 @@
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer *preview;
 @property (nonatomic, strong) AVCaptureVideoDataOutput   *dataOutput;
 
+@property (nonatomic, assign) BOOL isLight;
 @end
 
 @implementation QRCodeScan
@@ -34,12 +35,13 @@
     return self;
 }
 
-- (void)start {
-    [self.session startRunning];
+- (void)setScanRect:(CGRect)scanRect {
+    _scanRect = scanRect;
+    _output.rectOfInterest = CGRectMake(scanRect.origin.y/APP.window.h, scanRect.origin.x/APP.window.w, scanRect.size.height/APP.window.h,scanRect.size.width/APP.window.w);
 }
 
-- (void)setCompleteBlock:(QRCodeScanBlock)block {
-    _completeBlock = block;
+- (void)start {
+    [self.session startRunning];
 }
 
 - (void)setup {
@@ -51,8 +53,9 @@
     // Output
     _output = [[AVCaptureMetadataOutput alloc]init];
     [_output setMetadataObjectsDelegate:self queue:dispatch_get_main_queue()];
-    [ _output setRectOfInterest : CGRectMake (( 124 )/ self.bounds.size.width ,(( self.bounds.size.width - 220 )/ 2 )/ self.bounds.size.width , 220 / self.bounds.size.width , 220 / self.bounds.size.width )];
+//    [ _output setRectOfInterest : CGRectMake (( 124 )/ self.bounds.size.width ,(( self.bounds.size.width - 220 )/ 2 )/ self.bounds.size.width , 220 / self.bounds.size.width , 220 / self.bounds.size.width )];
     
+//    _output.rectOfInterest = self.scanRect;
     _dataOutput = [[AVCaptureVideoDataOutput alloc]init];
 
     // Configure your output.
@@ -107,8 +110,8 @@
     UIImage *image = [self imageFromSampleBuffer:sampleBuffer];
 // 自己保存最后一张图片 lastImage
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (self.completeBlock) {
-            self.completeBlock(image);
+        if (self.imageBlock) {
+            self.imageBlock(image);
         }
     });
     
@@ -121,16 +124,12 @@
     {
         AVMetadataMachineReadableCodeObject * metadataObject = [metadataObjects objectAtIndex:0];
         stringValue = metadataObject.stringValue;
+        if (self.rsltBlock) {
+            self.rsltBlock(stringValue);
+        }
     }
-    
     [_session stopRunning];
-
-    if (self.completeBlock) {
-//        self.completeBlock(stringValue);
-    }
 }
-
-
 
 // Create a UIImage from sample buffer data
 - (UIImage *) imageFromSampleBuffer:(CMSampleBufferRef) sampleBuffer
@@ -171,6 +170,33 @@
     CGImageRelease(quartzImage);
     
     return (image);
+}
+
+- (void) turnTorchOn: (bool) on {
+    
+    Class captureDeviceClass = NSClassFromString(@"AVCaptureDevice");
+    if (captureDeviceClass != nil) {
+        AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+        if ([device hasTorch] && [device hasFlash]){            
+            [device lockForConfiguration:nil];
+            if (on) {
+                [device setTorchMode:AVCaptureTorchModeOn];
+                [device setFlashMode:AVCaptureFlashModeOn];
+                self.isLight = YES;
+            } else {
+                [device setTorchMode:AVCaptureTorchModeOff];
+                [device setFlashMode:AVCaptureFlashModeOff];
+                self.isLight = NO;
+            }
+            [device unlockForConfiguration];
+        }
+    }
+}
+
+- (void)dealloc {
+    if (self.isLight) {
+        [self turnTorchOn:NO];
+    }
 }
 
 @end
